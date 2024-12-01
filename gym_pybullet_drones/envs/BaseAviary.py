@@ -976,6 +976,11 @@ class BaseAviary(gym.Env):
                    p.getQuaternionFromEuler([0,0,0]),
                    physicsClientId=self.CLIENT
                    )
+        p.loadURDF("basic_spaceship.urdf",
+                   [0, 0, 0.5],
+                   p.getQuaternionFromEuler([0,0,0]),
+                   physicsClientId=self.CLIENT
+                   )
     
     ################################################################################
     

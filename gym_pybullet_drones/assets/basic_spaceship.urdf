@@ -1,0 +1,164 @@
+<?xml version="1.0"?>
+<robot name="rocket">
+  <!-- Main Body -->
+  <properties arm="0.035"   kf="3.16e-10" km="7.94e-12" thrust2weight="2.25" max_speed_kmh="40" gnd_eff_coeff="11.36859" prop_radius="2.31348e-2" drag_coeff_xy="9.1785e-7" drag_coeff_z="10.311e-7" dw_coeff_1="2267.18" dw_coeff_2=".16" dw_coeff_3="-.11" />
+
+  <link name="mid">
+    <inertial>
+      <origin xyz="0 0 0"/>
+      <mass value="15"/>
+      <inertia ixx="3.375" ixy="0" ixz="0" iyy="3.375" iyz="0" izz="0.11390625"/>
+    </inertial>
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <cylinder length="0.85" radius="0.075"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <cylinder length="0.85" radius="0.075"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <!-- Left Fin -->
+  <link name="left">
+    <inertial>
+      <origin xyz="0 0 0"/>
+      <mass value="7"/>
+      <inertia ixx="0.75675" ixy="0" ixz="0" iyy="0.75675" iyz="0" izz="0.019875"/>
+    </inertial>
+    <visual>
+      <origin rpy="0 0 0" xyz="-0.075 0 -0.025"/>
+      <geometry>
+        <cylinder length="0.8" radius="0.05"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="-0.075 0 0"/>
+      <geometry>
+        <cylinder length="0.75" radius="0.05"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <!-- Right Fin -->
+  <link name="right">
+    <inertial>
+      <origin xyz="0 0 -0.1"/>
+      <mass value="7"/>
+      <inertia ixx="0.75675" ixy="0" ixz="0" iyy="0.75675" iyz="0" izz="0.019875"/>
+    </inertial>
+    <visual>
+      <origin rpy="0 0 0" xyz="0.075 0 -0.025"/>
+      <geometry>
+        <cylinder length="0.8" radius="0.05"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="0.075 0 0"/>
+      <geometry>
+        <cylinder length="0.75" radius="0.05"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <!-- Nose Cone -->
+  <link name="s_mid">
+    <inertial>
+      <origin xyz="0 0 0"/>
+      <mass value="2"/>
+      <inertia ixx="0.01077" ixy="0" ixz="0" iyy="0.01077" iyz="0" izz="0.01077"/>
+    </inertial>
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0.425"/>
+      <geometry>
+        <sphere radius="0.075"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0.425"/>
+      <geometry>
+        <sphere radius="0.075"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <!-- Left Fin Tip -->
+  <link name="s_left">
+    <inertial>
+      <origin xyz="0 0 0"/>
+      <mass value="1"/>
+      <inertia ixx="0.000524" ixy="0" ixz="0" iyy="0.000524" iyz="0" izz="0.000524"/>
+    </inertial>
+    <visual>
+      <origin rpy="0 0 0" xyz="-0.075 0 0.375"/>
+      <geometry>
+        <sphere radius="0.05"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="-0.075 0 0.375"/>
+      <geometry>
+        <sphere radius="0.05"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <!-- Right Fin Tip -->
+  <link name="s_right">
+    <inertial>
+      <origin xyz="0 0 0"/>
+      <mass value="1"/>
+      <inertia ixx="0.000524" ixy="0" ixz="0" iyy="0.000524" iyz="0" izz="0.000524"/>
+    </inertial>
+    <visual>
+      <origin rpy="0 0 0" xyz="0.075 0 0.375"/>
+      <geometry>
+        <sphere radius="0.05"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="0.075 0 0.375"/>
+      <geometry>
+        <sphere radius="0.05"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <!-- Joints -->
+  <joint name="joint_mid_s_mid" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+    <parent link="mid"/>
+    <child link="s_mid"/>
+  </joint>
+
+  <joint name="joint_mid_left" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+    <parent link="mid"/>
+    <child link="left"/>
+  </joint>
+
+  <joint name="joint_mid_right" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+    <parent link="mid"/>
+    <child link="right"/>
+  </joint>
+
+  <joint name="joint_left_s_left" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+    <parent link="left"/>
+    <child link="s_left"/>
+  </joint>
+
+  <joint name="joint_right_s_right" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+    <parent link="right"/>
+    <child link="s_right"/>
+  </joint>
+
+  <!-- Klampt Configuration -->
+  <klampt package_root="../../.." default_acc_max="4"></klampt>
+</robot>

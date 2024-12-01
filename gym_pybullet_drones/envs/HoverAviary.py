@@ -79,7 +79,8 @@ class HoverAviary(BaseRLAviary):
         return ret
 
     ################################################################################
-    
+    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    #TO DO Utka upala
     def _computeTerminated(self):
         """Computes the current done value.
 
