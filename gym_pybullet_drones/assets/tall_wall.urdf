@@ -1,0 +1,24 @@
+<robot name="tall_wall">
+  <link name="wall">
+    <inertial>
+      <origin xyz="2.5 2.5 2.5" /> <!-- Center of mass at half the height -->
+      <mass value="10.0" />
+      <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="10.0" iyz="0.0" izz="1.0" />
+    </inertial>
+    <visual>
+      <origin xyz="2.5 2.5 2.5" /> <!-- Place the center of the wall at half its height -->
+      <geometry>
+        <box size="10 0.1 5" /> <!-- Width, thickness, and height -->
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="2.5 2.5 2.5" /> <!-- Place the collision shape center at half its height -->
+      <geometry>
+        <box size="10 0.1 5" /> <!-- Width, thickness, and height -->
+      </geometry>
+    </collision>
+  </link>
+  <gazebo reference="wall">
+    <material>Gazebo/Blue</material>
+  </gazebo>
+</robot>

@@ -1,0 +1,19 @@
+<robot name="target_marker">
+  <link name="target">
+    <visual>
+      <origin xyz="0 7 0.01"/> <!-- Slightly above ground -->
+      <geometry>
+        <box size="1 1 0.02"/> <!-- A flat square -->
+      </geometry>
+      <material name="green">
+        <color rgba="0 1 0 1"/> <!-- Green color -->
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 7 0.01"/>
+      <geometry>
+        <box size="1 1 0.02"/>
+      </geometry>
+    </collision>
+  </link>
+</robot>

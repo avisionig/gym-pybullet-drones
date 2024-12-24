@@ -38,6 +38,14 @@ class SpaceshipAviary(BaseRLAviary):
         self.FUEL_CAPACITY = 100
         self.TARGET_POS = np.array([0, 0, 10])
         self.EPISODE_LEN_SEC = 20
+
+        # Define action space (add this line)
+        self.action_space = spaces.Box(low=-1, high=1, shape=(4,), dtype=np.float32)
+        # Action format: [thrust, roll, pitch, yaw]
+        
+        # Define observation space (already present, but ensure it's here)
+        self.observation_space = self._observationSpace()
+
         # Call the base class initializer
         super().__init__(
             drone_model=spaceship_model,
@@ -53,19 +61,33 @@ class SpaceshipAviary(BaseRLAviary):
             act=self.ACT_TYPE
         )
 
-        # After base class initialization, override or add any additional setup
-        # For example, add the spaceship
         self._addSpaceship()
-        # Update DRONE_IDS to include the spaceship ID
+        self._addAssets()
         self.DRONE_IDS = [self.spaceship_id]
 
     def _addAssets(self):
-        """Override to add the spaceship instead of drones."""
-        # Add your spaceship
-        self._addSpaceship()
-        # Update DRONE_IDS
+
         self.DRONE_IDS = [self.spaceship_id]
 
+        wall_urdf_path = r"C:\Users\Hp\Desktop\RL\gym-pybullet-drones\gym_pybullet_drones\assets\tall_wall.urdf"
+        
+        self.wall_id = p.loadURDF(
+            wall_urdf_path,
+            physicsClientId=self.CLIENT
+        )
+        if self.wall_id < 0:
+            raise ValueError("Failed to load wall URDF!")
+        
+        target_urdf_path = pkg_resources.resource_filename('gym_pybullet_drones', 'assets/target_marker.urdf')  # Assuming you have a URDF for the target marker
+        target_position = [0, 7, 0.01]
+        self.target_id = p.loadURDF(
+            target_urdf_path,
+            physicsClientId=self.CLIENT
+        )
+        if self.target_id < 0:
+            raise ValueError("Failed to load target marker URDF!")
+    
+        self.TARGET_POS = np.array(target_position)
 
     def _housekeeping(self):
         """Override to include base class housekeeping."""
@@ -81,7 +103,7 @@ class SpaceshipAviary(BaseRLAviary):
         # Construct the full path to the URDF file
         # urdf_file = pkg_resources.resource_filename('gym_pybullet_drones', 'assets/basic_spaceship.urdf')
         self.spaceship_id = p.loadURDF(
-            'C:\\Users\\Ayan\\Desktop\\endka\\gym-pybullet-drones\\gym_pybullet_drones\\assets\\basic_spaceship.urdf',
+            r'..\assets\basic_spaceship.urdf',
             basePosition=self.INIT_XYZS[0],
             baseOrientation=p.getQuaternionFromEuler(self.INIT_RPYS[0]),
             physicsClientId=self.CLIENT
@@ -114,7 +136,8 @@ class SpaceshipAviary(BaseRLAviary):
 
         # Re-add the spaceship
         self._addSpaceship()
-        self.DRONE_IDS = [self.spaceship_id]
+        self._addAssets()
+        self.DRONE_IDS = [self.spaceship_id, self.wall_id]
 
         # Update kinematic information
         self._updateAndStoreKinematicInformation()
@@ -152,27 +175,64 @@ class SpaceshipAviary(BaseRLAviary):
 
     def _computeReward(self):
         """
-        Computes the current reward value, including penalties and rewards.
+        Computes the reward value, focusing on progress, movement, and proximity to the target.
         """
         state = self._getSpaceshipState()
         position = state["position"]
         velocity = state["velocity"]
 
-        # Compute speed
+        # Current distance to target
+        current_distance_to_target = np.linalg.norm(self.TARGET_POS - position)
+
+        # Initialize tracking variables for progress
+        if not hasattr(self, 'prev_distance_to_target'):  # Initialize if not already present
+            self.prev_distance_to_target = current_distance_to_target
+            self.prev_altitude = position[2]
+
+        # Horizontal and vertical distances
+        horizontal_distance_to_target = np.linalg.norm(self.TARGET_POS[:2] - position[:2])
+        altitude_to_target = abs(self.TARGET_POS[2] - position[2])
+
+        # Track progress (reward for reducing horizontal distance)
+        distance_delta = self.prev_distance_to_target - current_distance_to_target
+        self.prev_distance_to_target = current_distance_to_target
+        progress_reward = max(0, distance_delta * 10)  # Strong reward for reducing distance
+
+        # Vertical progress: Reward for moving toward the target altitude
+        vertical_delta = position[2] - self.prev_altitude
+        self.prev_altitude = position[2]
+        vertical_progress_reward = max(0, vertical_delta * 10)
+
+        # Movement reward: Encourage any movement (speed above a threshold)
         speed = np.linalg.norm(velocity)
+        movement_reward = 5.0 if speed > 0.2 else -5.0  # Strong penalty for being stationary
 
-        stationary_threshold = 0.1  # Define a threshold for considering the spaceship as stationary
-        if speed < stationary_threshold:
-            stationary_penalty = 1.0  # Penalize for being stationary
-        else:
-            stationary_penalty = 0.0
+        # Proximity reward: Reward for being close to the target
+        proximity_reward = 1 / (1 + current_distance_to_target)  # Avoids exponential scaling
 
-        flying_reward = speed * 0.1  # Reward proportional to speed
-        distance_to_target = np.linalg.norm(self.TARGET_POS - position)
-        proximity_reward = max(0, 1 - distance_to_target * 0.1)
-        reward = flying_reward + proximity_reward - stationary_penalty
-        fuel_penalty = (self.FUEL_CAPACITY - self.fuel) * 0.01
-        reward -= fuel_penalty
+        # Penalize increases in distance to target
+        distance_penalty = -10.0 if distance_delta < 0 else 0.0
+
+        # Altitude penalty: Penalize flying too high
+        altitude_penalty = 0.0
+        if position[2] > 15:  # Example threshold for high altitude
+            altitude_penalty = (position[2] - 15) * 0.2
+
+        # Combine all rewards and penalties
+        reward = (
+            progress_reward        # Reward for reducing distance
+            + vertical_progress_reward  # Reward for upward movement
+            + movement_reward      # Reward for movement
+            + proximity_reward     # Reward for being close to the target
+            + distance_penalty     # Penalize increasing distance
+            - altitude_penalty     # Penalize flying too high
+        )
+
+        # Debugging logs for reward components
+        print(f"[DEBUG] Progress reward: {progress_reward:.2f}, Vertical progress reward: {vertical_progress_reward:.2f}, "
+            f"Movement reward: {movement_reward:.2f}, Proximity reward: {proximity_reward:.2f}, "
+            f"Distance penalty: {distance_penalty:.2f}, Altitude penalty: {altitude_penalty:.2f}, "
+            f"Total reward: {reward:.2f}")
 
         return reward
 
@@ -205,21 +265,54 @@ class SpaceshipAviary(BaseRLAviary):
                 "angular_velocity": np.zeros(3)
             }
 
+    # def _computeTerminated(self):
+    #     """Determines if the episode should be terminated."""
+    #     state = self._getSpaceshipState()
+    #     position = state["position"]
+    #     altitude = position[2]  # Z-coordinate represents altitude
+
+    #     if self.fuel <= 0:
+    #         return True
+    #     if np.linalg.norm(position[:2]) > 10.0:  # X-Y plane boundary radius
+    #         return True
+
+    #     if np.linalg.norm(self.TARGET_POS - position) < 0.1:
+    #         return True
+
+    #     if self.has_flown and altitude <= 0.1:  # Ground level threshold
+    #         return True
+
+    #     return False
+
     def _computeTerminated(self):
         """Determines if the episode should be terminated."""
         state = self._getSpaceshipState()
         position = state["position"]
-        altitude = position[2]  # Z-coordinate represents altitude
+        velocity = state["velocity"]
 
-        if self.fuel <= 0:
+        # Compute termination conditions
+        distance_to_target = np.linalg.norm(position[:2] - self.TARGET_POS[:2])  # X-Y plane distance
+        altitude_difference = abs(position[2] - self.TARGET_POS[2])  # Z-coordinate difference
+        speed = np.linalg.norm(velocity)
+
+        # Debugging outputs
+        # print(f"Current position: {position}")
+        # print(f"Target position: {self.TARGET_POS}")
+        # print(f"Distance to target: {distance_to_target}")
+        # print(f"Altitude difference: {altitude_difference}")
+        # print(f"Speed: {speed}")
+
+        # Landing criteria
+        landed_successfully = distance_to_target < 0.5 and altitude_difference < 0.1 and speed < 0.2
+
+        if landed_successfully:  # Successful landing
+            print("Rocket successfully landed on the target marker!")
+            return True
+        if self.fuel <= 0:  # Out of fuel
             return True
         if np.linalg.norm(position[:2]) > 10.0:  # X-Y plane boundary radius
             return True
-
-        if np.linalg.norm(self.TARGET_POS - position) < 0.1:
-            return True
-
-        if self.has_flown and altitude <= 0.1:  # Ground level threshold
+        if self.has_flown and position[2] <= 0.1:  # Crashed or landed off-target
             return True
 
         return False
@@ -258,9 +351,41 @@ class SpaceshipAviary(BaseRLAviary):
 
         return obs[:73]
 
+    # def _preprocessAction(self, action):
+    #     """Handle spaceship-specific action preprocessing."""
+    #     self.fuel -= np.linalg.norm(action) * 0.1  # Decrease fuel with action intensity
+    #     if self.fuel < 0:
+    #         self.fuel = 0  # Prevent negative fuel
+    #     return super()._preprocessAction(action)
+
     def _preprocessAction(self, action):
-        """Handle spaceship-specific action preprocessing."""
-        self.fuel -= np.linalg.norm(action) * 0.1  # Decrease fuel with action intensity
+        """
+        Preprocesses the action to include thrust and lateral movement.
+        """
+        # Ensure action is a 1D array
+        if len(action.shape) == 2:
+            action = action.squeeze(0)  # Remove the extra dimension
+
+        # Debug the shape after squeezing
+        # print(f"[DEBUG] Processed Action shape: {action.shape}, Action: {action}")
+
+        # Check the action shape
+        if action.shape[0] != 4:
+            raise ValueError(f"Action shape mismatch. Expected 4, got {action.shape[0]}")
+
+        # Parse the action components
+        thrust = action[0]  # Upward thrust
+        roll = action[1]    # Roll for lateral X movement
+        pitch = action[2]   # Pitch for lateral Y movement
+        yaw = action[3]     # Yaw for rotation
+
+        # Decrease fuel based on action intensity
+        self.fuel -= abs(thrust) * 0.1 + abs(roll) * 0.05 + abs(pitch) * 0.05 + abs(yaw) * 0.05
         if self.fuel < 0:
-            self.fuel = 0  # Prevent negative fuel
-        return super()._preprocessAction(action)
+            self.fuel = 0
+
+        # Apply forces and torques to the spaceship
+        p.applyExternalForce(self.spaceship_id, -1, [roll, pitch, thrust], [0, 0, 0], p.LINK_FRAME)
+        p.applyExternalTorque(self.spaceship_id, -1, [0, 0, yaw], p.LINK_FRAME)
+
+        return action
